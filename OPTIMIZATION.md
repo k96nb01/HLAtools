@@ -246,6 +246,24 @@ calls (`A/cDNA`, `A/gDNA`, `DRB1/gDNA`):**
 **Per-`buildAlignments` harness (5 calls covering every hotspot):** 88.6 s → 37.9 s
 (**2.34×**).
 
+### Full-scale: 40-locus build
+
+To confirm the result at near-full scale, the entire gazetteer was built — every
+locus across all alignment types — **except HLA-B**, which has a pre-existing
+upstream cDNA bug that crashes the build in both versions (see
+[§10](#10-pre-existing-bug-hla-b-cdna-crashes-the-all-loci-build)). 40 loci built
+(prot = 26, codon = 40, nuc = 40, gen = 40; ~1.96 GB object):
+
+| | elapsed | CPU (user) |
+|--|--------:|-----------:|
+| Original | 401.3 s | 336.2 s |
+| Optimized | **159.4 s** | **116.5 s** |
+| **Speedup** | **2.52×** | **2.89×** |
+
+Critically, the two 40-locus results were compared with `identical()` and are
+**identical across every locus and alignment type** — full-scale proof that the
+optimization changes nothing about the output.
+
 ---
 
 ## 7. Test suite
@@ -286,6 +304,14 @@ The `dev/` folder (build-ignored) holds the harnesses:
 | `dev/verify_fast.R` | Faster per-`buildAlignments` `identical()` check for rapid iteration |
 | `dev/profile.R` | Line-level `Rprof` profile of `buildAlignments` |
 | `dev/run_tests.R` | Run the full `testthat` suite via `pkgload::load_all` |
+| `dev/build_most_loci.R` | Build the 40-locus (all-except-B) set; `<label>` selects the output file |
+| `dev/compare_most_loci.R` | Assert the original vs optimized 40-locus builds are `identical()` |
+| `dev/diagnose_loci.R` | Per-locus build check that isolated the HLA-B cDNA failure |
+
+The before/after at full scale was produced by checking out the original two R
+files (`git checkout <upstream> -- R/alignmentFull.R R/buildAlignments.R`),
+running `build_most_loci.R original`, restoring the optimized files, running
+`build_most_loci.R optimized`, then `compare_most_loci.R`.
 
 Run any of them with, e.g.:
 
@@ -312,6 +338,38 @@ thin and were left alone as poor risk/reward:
   payoff is small relative to the complexity (and concurrent requests to the
   ANHIG repo are best avoided). This is the natural next lever if a full-repo
   build is still too slow.
+
+---
+
+## 10. Pre-existing bug: HLA-B cDNA crashes the all-loci build
+
+While running the full-scale test, the **default `alignmentFull(loci = "all")`
+fails** on release 3.64.0 with:
+
+```
+Error in corr_table[[loci[i]]][1, ] <- names(HLAalignments[[loci[i]]][5:ncol(...)]) :
+  number of items to replace is not a multiple of replacement length
+```
+
+This is **a pre-existing bug in the upstream code**, *not* introduced by this
+optimization work — the failing line is original code that was not modified, and
+the error reproduces identically on the unmodified `sjmack/HLAtools` v1.8.1.
+
+A per-locus diagnostic (`dev/diagnose_loci.R`) isolated it to **exactly one
+build: HLA-B `cDNA`**. Every other combination succeeds — all 40 other nuc/cDNA
+loci, all 41 gen/gDNA loci, and all 27 prot/AA loci, *including* HLA-B's `gDNA`
+and `AA` builds. Because `B` is the second locus in the `nuc` list, its cDNA
+failure aborts the whole `alignmentFull("all")` run after ~29 s.
+
+The cause is a mismatch between the pre-allocated width of `B`'s correspondence
+table and the parsed width of its cDNA alignment — likely an edge case in the
+ragged-block / extended-sequence repair logic for the most polymorphic locus.
+
+**Scope note:** this bug is independent of the performance work and is *not*
+fixed here, because fixing it changes HLA-B's output and there is no original
+baseline to verify against (the original simply crashes). It deserves its own
+focused pass. The full-scale benchmark in [§6](#6-benchmark-results) therefore
+builds the 40-locus set excluding `B`.
 
 ---
 

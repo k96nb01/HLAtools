@@ -51,8 +51,10 @@ inst/doc
 /doc/
 /Meta/
 
-# Logs from the dev/ performance-optimization harness scripts
+# Logs and build artifacts from the dev/ performance-optimization harness
 *.log
+dev/*.out
+dev/*.rds
 
 # Dev-only iteration artifact: the per-call fast regression baseline used by
 # dev/verify_fast.R. It is large (~5 MB) and regenerable on demand with
