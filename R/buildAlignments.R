@@ -420,6 +420,36 @@ buildAlignments<-function(loci, source, version = "Latest", return_corr_table = 
       #as the reference sequence (AA table only)
       if(source[j]=="AA"){pepsplit[[loci[i]]]<- lapply(pepsplit[[loci[i]]],function(x) c(x,rep(".",nchar(refexon[[loci[i]]])-length(x))))}
 
+      # BUGFIX (e.g. B*44:568Q and B*51:197 in B_nuc.txt): a few IMGT cDNA/gDNA
+      # alleles appear in trailing alignment blocks that the reference allele
+      # (row 1) does not span, so after splitting their sequences are longer or
+      # shorter than the reference. do.call(rbind, ...) below would silently
+      # recycle such ragged rows to the longest one, corrupting the column count
+      # and later throwing "number of items to replace is not a multiple of
+      # replacement length" at the corr_table fill -- which made the default
+      # alignmentFull(loci = "all") fail on HLA-B. The reference defines the
+      # position coordinate system (corr_table's width is the reference length),
+      # so normalize every sequence to the reference length: trim sequence that
+      # extends beyond the reference (it has no reference-relative position) and
+      # pad short partial sequences with "." (the same fill used for AA premature
+      # termination just above). The reference row is never altered, so the
+      # inDel/exon detection that reads row 1 is unaffected, and for loci with no
+      # ragged sequences this loop is a no-op, leaving their output unchanged.
+      if(source[j]=="cDNA"|source[j]=="gDNA"){
+        refLen <- length(pepsplit[[loci[i]]][[1]])
+        raggedRows <- which(lengths(pepsplit[[loci[i]]]) != refLen)
+        if(length(raggedRows) > 0){
+          message(paste0(length(raggedRows), " ", loci[i], " ", source[j],
+                         " allele sequence(s) did not match the reference length (",
+                         refLen, ") and were trimmed or padded to it."))
+          pepsplit[[loci[i]]] <- lapply(pepsplit[[loci[i]]], function(x) {
+            if(length(x) > refLen) { x[seq_len(refLen)] }
+            else if(length(x) < refLen) { c(x, rep(".", refLen - length(x))) }
+            else { x }
+          })
+        }
+      }
+
       #nullifies variable names
       names(pepsplit[[loci[i]]]) <- NULL
 

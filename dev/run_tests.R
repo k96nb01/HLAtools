@@ -5,6 +5,11 @@
 # Run with:
 #   Rscript "C:\GitHub\HLAtools_fast\dev\run_tests.R"
 
+# Run skip_on_cran() tests too (the HLA-B network regression test). devtools
+# sets this automatically; a bare Rscript run does not, so set it here. The
+# network tests still self-skip when offline via skip_if_offline().
+Sys.setenv(NOT_CRAN = "true")
+
 # Load the package source so all (including non-exported) functions and
 # bundled data objects are available to the tests.
 suppressMessages(pkgload::load_all("C:/GitHub/HLAtools_fast", quiet = TRUE))

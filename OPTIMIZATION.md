@@ -1,15 +1,20 @@
 # HLAtools Performance Optimization — `alignmentFull()` / `buildAlignments()`
 
 This document records a performance-optimization pass over `HLAtools`, focused on
-`alignmentFull()` and the function it drives, `buildAlignments()`. **Every change
-preserves behavior exactly**: the optimized code reproduces the original output
-byte-for-byte (verified with `identical()` against a saved baseline).
+`alignmentFull()` and the function it drives, `buildAlignments()`. **Every
+performance change preserves behavior exactly**: the optimized code reproduces the
+original output byte-for-byte (verified with `identical()` against a saved
+baseline). A separate, clearly-scoped bug fix ([§10](#10-bug-fix-hla-b-cdna-crash-in-the-all-loci-build))
+makes the default `alignmentFull(loci = "all")` work again.
 
 - **Upstream:** `sjmack/HLAtools` (v1.8.1, commit `edc9cdc`)
 - **Fork / working copy:** `k96nb01/HLAtools`, branch `perf-optimization`
 - **Headline result:** the representative 3-locus, all-types build dropped from
-  **~139 s to ~48 s (≈2.9× faster)**; CPU work measured by the profiler dropped
-  **≈2.75×**. Output is unchanged.
+  **~139 s to ~48 s (≈2.9× faster)**; at full scale (40 loci) **401 s → 159 s
+  (2.5× wall, 2.9× CPU)**, output `identical()`. The performance work changes no
+  output.
+- **Bonus fix:** `alignmentFull(loci = "all")` previously crashed on a
+  pre-existing HLA-B cDNA bug; it is fixed here and now builds the full gazetteer.
 
 ---
 
@@ -249,9 +254,10 @@ calls (`A/cDNA`, `A/gDNA`, `DRB1/gDNA`):**
 ### Full-scale: 40-locus build
 
 To confirm the result at near-full scale, the entire gazetteer was built — every
-locus across all alignment types — **except HLA-B**, which has a pre-existing
-upstream cDNA bug that crashes the build in both versions (see
-[§10](#10-pre-existing-bug-hla-b-cdna-crashes-the-all-loci-build)). 40 loci built
+locus across all alignment types — **except HLA-B**, whose cDNA build crashes in
+the *original* code (a pre-existing upstream bug now fixed in this fork; see
+[§10](#10-bug-fix-hla-b-cdna-crash-in-the-all-loci-build)). The original cannot
+build B at all, so the apples-to-apples comparison uses the 40-locus set
 (prot = 26, codon = 40, nuc = 40, gen = 40; ~1.96 GB object):
 
 | | elapsed | CPU (user) |
@@ -307,6 +313,8 @@ The `dev/` folder (build-ignored) holds the harnesses:
 | `dev/build_most_loci.R` | Build the 40-locus (all-except-B) set; `<label>` selects the output file |
 | `dev/compare_most_loci.R` | Assert the original vs optimized 40-locus builds are `identical()` |
 | `dev/diagnose_loci.R` | Per-locus build check that isolated the HLA-B cDNA failure |
+| `dev/validate_B_fix.R` | Confirm HLA-B builds for all sources after the fix |
+| `dev/verify_fix_noop.R` | Prove the B fix leaves all 40 other loci `identical()` |
 
 The before/after at full scale was produced by checking out the original two R
 files (`git checkout <upstream> -- R/alignmentFull.R R/buildAlignments.R`),
@@ -341,10 +349,10 @@ thin and were left alone as poor risk/reward:
 
 ---
 
-## 10. Pre-existing bug: HLA-B cDNA crashes the all-loci build
+## 10. Bug fix: HLA-B cDNA crash in the all-loci build
 
 While running the full-scale test, the **default `alignmentFull(loci = "all")`
-fails** on release 3.64.0 with:
+was found to crash** on release 3.64.0 with:
 
 ```
 Error in corr_table[[loci[i]]][1, ] <- names(HLAalignments[[loci[i]]][5:ncol(...)]) :
@@ -355,21 +363,51 @@ This is **a pre-existing bug in the upstream code**, *not* introduced by this
 optimization work — the failing line is original code that was not modified, and
 the error reproduces identically on the unmodified `sjmack/HLAtools` v1.8.1.
 
-A per-locus diagnostic (`dev/diagnose_loci.R`) isolated it to **exactly one
-build: HLA-B `cDNA`**. Every other combination succeeds — all 40 other nuc/cDNA
-loci, all 41 gen/gDNA loci, and all 27 prot/AA loci, *including* HLA-B's `gDNA`
-and `AA` builds. Because `B` is the second locus in the `nuc` list, its cDNA
-failure aborts the whole `alignmentFull("all")` run after ~29 s.
+**This fork fixes it.**
 
-The cause is a mismatch between the pre-allocated width of `B`'s correspondence
-table and the parsed width of its cDNA alignment — likely an edge case in the
-ragged-block / extended-sequence repair logic for the most polymorphic locus.
+**Root cause.** A per-locus diagnostic (`dev/diagnose_loci.R`) isolated the
+failure to **exactly one build: HLA-B `cDNA`** (HLA-B's `gDNA` and `AA` build
+fine, as do all other loci). In `B_nuc.txt`, a handful of alleles — e.g.
+`B*44:568Q` and `B*51:197` — appear in a **trailing alignment block that the
+reference allele `B*07:02:01:01` does not span** (the reference spans 17 blocks;
+these alleles span 18). This is a genuine IMGT data structure: those alleles
+carry 3′ sequence extending past the reference, which leaves their assembled
+sequences a different length from the reference (1738 and 1458 vs the reference's
+1473). `do.call(rbind, ...)` — with its warning suppressed — then silently
+recycled these ragged rows to the longest one, corrupting the alignment width and
+throwing the cryptic error at the correspondence-table fill (whose width is the
+reference length).
 
-**Scope note:** this bug is independent of the performance work and is *not*
-fixed here, because fixing it changes HLA-B's output and there is no original
-baseline to verify against (the original simply crashes). It deserves its own
-focused pass. The full-scale benchmark in [§6](#6-benchmark-results) therefore
-builds the 40-locus set excluding `B`.
+**The fix** (`R/buildAlignments.R`, just after the per-character split). The
+reference allele defines the position coordinate system, so every cDNA/gDNA
+sequence is normalized to the reference length before the bind: sequence
+extending **beyond** the reference is trimmed (it has no reference-relative
+position), and **short** partial sequences are padded with `"."` — the same fill
+the function already uses for amino-acid premature termination. The reference row
+is never altered, so the indel/exon-boundary detection that reads row 1 is
+unaffected. A `message()` reports the locus, source, and number of sequences
+normalized.
+
+**Validation.**
+- `alignmentFull(loci = "all")` now **completes** for the full gazetteer
+  (prot = 27, codon = 41, nuc = 41, gen = 41).
+- Across that full build, **only the two HLA-B cDNA alleles triggered the
+  normalization** — every other locus is a no-op.
+- The 40 non-B loci were compared table-by-table (**146 tables**) against the
+  pre-fix build and are **identical**; the A/DRB1/DPB1 baseline is also unchanged.
+  The fix is surgical — it makes HLA-B buildable and changes nothing else.
+- A network-guarded regression test
+  (`tests/testthat/test-buildAlignments-B-regression.R`) builds HLA-B cDNA and
+  asserts the table is rectangular (11 110 × 1 477) with both formerly-ragged
+  alleles present.
+
+**Note for upstream.** This is a behavior change for the two affected HLA-B cDNA
+alleles only — they are normalized to the reference frame. Because the original
+code could not produce *any* HLA-B cDNA output (it crashed), there is no prior
+baseline for those alleles to preserve. The full-scale benchmark in
+[§6](#6-benchmark-results) still reports the 40-locus (ex-B) set so the before/
+after is an apples-to-apples comparison against the original, which cannot build
+B at all.
 
 ---
 
