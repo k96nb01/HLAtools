@@ -62,3 +62,6 @@ dev/*.rds
 # The committed tests/testthat/fixtures/alignmentFull_baseline.rds is the
 # fixture the test suite actually needs.
 tests/testthat/fixtures/buildAlignments_fast_baseline.rds
+
+# Fork-specific RStudio project file (kept locally, not tracked)
+*.Rproj
