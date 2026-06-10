@@ -1,7 +1,9 @@
 # Prove the HLA-B fix is a no-op for every other locus: the 40 non-B loci in the
 # post-fix all-loci build must be identical() to the pre-fix 40-locus build.
-fixed <- readRDS("C:/GitHub/HLAtools_fast/dev/all_loci_optimized_fixed.rds")  # all 41 loci, with fix
-prefix <- readRDS("C:/GitHub/HLAtools_fast/dev/most_loci_optimized.rds")       # 40 loci (no B), pre-fix
+.scriptArgs <- commandArgs(FALSE); .scriptFile <- sub("^--file=", "", .scriptArgs[grep("^--file=", .scriptArgs)])
+pkg_root <- if (length(.scriptFile)) dirname(dirname(normalizePath(.scriptFile))) else normalizePath(getwd())  # repo root = parent of dev/
+fixed <- readRDS(file.path(pkg_root, "dev/all_loci_optimized_fixed.rds"))  # all 41 loci, with fix
+prefix <- readRDS(file.path(pkg_root, "dev/most_loci_optimized.rds"))       # 40 loci (no B), pre-fix
 
 ok <- TRUE; checked <- 0
 for (typ in c("prot","codon","nuc","gen")) {

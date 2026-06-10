@@ -23,8 +23,7 @@
   error = function(e) {
     candidates <- c(
       file.path("fixtures", "alignmentFull_baseline.rds"),
-      file.path("tests", "testthat", "fixtures", "alignmentFull_baseline.rds"),
-      "C:/GitHub/HLAtools_fast/tests/testthat/fixtures/alignmentFull_baseline.rds"
+      file.path("tests", "testthat", "fixtures", "alignmentFull_baseline.rds")
     )
     hit <- candidates[file.exists(candidates)]
     if (length(hit) == 0) stop("Cannot locate alignmentFull_baseline.rds fixture.")

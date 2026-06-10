@@ -1,7 +1,9 @@
 # Validate the HLA-B cDNA fix: B should now build for all sources, the two
 # formerly-ragged alleles should be normalized to the reference width, and the
 # reference allele's sequence must be untouched.
-suppressMessages(pkgload::load_all("C:/GitHub/HLAtools_fast", quiet = TRUE))
+.scriptArgs <- commandArgs(FALSE); .scriptFile <- sub("^--file=", "", .scriptArgs[grep("^--file=", .scriptArgs)])
+pkg_root <- if (length(.scriptFile)) dirname(dirname(normalizePath(.scriptFile))) else normalizePath(getwd())  # repo root = parent of dev/
+suppressMessages(pkgload::load_all(pkg_root, quiet = TRUE))
 VERSION <- "3.64.0"
 
 for (src in c("cDNA","gDNA","AA")) {

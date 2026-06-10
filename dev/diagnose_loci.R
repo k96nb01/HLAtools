@@ -2,7 +2,9 @@
 # in the working tree. alignmentFull(loci="all") crashes on release 3.64.0; this
 # pinpoints the offending locus/loci so we can characterize the bug and choose a
 # buildable locus set for the before/after timing.
-suppressMessages(pkgload::load_all("C:/GitHub/HLAtools_fast", quiet = TRUE))
+.scriptArgs <- commandArgs(FALSE); .scriptFile <- sub("^--file=", "", .scriptArgs[grep("^--file=", .scriptArgs)])
+pkg_root <- if (length(.scriptFile)) dirname(dirname(normalizePath(.scriptFile))) else normalizePath(getwd())  # repo root = parent of dev/
+suppressMessages(pkgload::load_all(pkg_root, quiet = TRUE))
 VERSION <- "3.64.0"
 
 try_build <- function(locus, src) {

@@ -3,23 +3,28 @@
 # against tests/testthat/ and prints a summary.
 #
 # Run with:
-#   Rscript "C:\GitHub\HLAtools_fast\dev\run_tests.R"
+#   Rscript dev/run_tests.R        (the script locates the repo root itself)
 
 # Run skip_on_cran() tests too (the HLA-B network regression test). devtools
 # sets this automatically; a bare Rscript run does not, so set it here. The
 # network tests still self-skip when offline via skip_if_offline().
 Sys.setenv(NOT_CRAN = "true")
 
+# Resolve the repo root from this script's own location so this runs from any
+# working directory, both locally and in CI -- no hardcoded path.
+.scriptArgs <- commandArgs(FALSE); .scriptFile <- sub("^--file=", "", .scriptArgs[grep("^--file=", .scriptArgs)])
+pkg_root <- if (length(.scriptFile)) dirname(dirname(normalizePath(.scriptFile))) else normalizePath(getwd())  # repo root = parent of dev/
+
 # Load the package source so all (including non-exported) functions and
 # bundled data objects are available to the tests.
-suppressMessages(pkgload::load_all("C:/GitHub/HLAtools_fast", quiet = TRUE))
+suppressMessages(pkgload::load_all(pkg_root, quiet = TRUE))
 
 library(testthat)
 
 # Run every test-*.R file in the suite. stop_on_failure = FALSE so that the
 # full tally is reported even if some tests fail.
 res <- test_dir(
-  "C:/GitHub/HLAtools_fast/tests/testthat",
+  file.path(pkg_root, "tests", "testthat"),
   reporter = "summary",
   stop_on_failure = FALSE
 )

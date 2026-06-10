@@ -315,20 +315,25 @@ The `dev/` folder (build-ignored) holds the harnesses:
 | `dev/diagnose_loci.R` | Per-locus build check that isolated the HLA-B cDNA failure |
 | `dev/validate_B_fix.R` | Confirm HLA-B builds for all sources after the fix |
 | `dev/verify_fix_noop.R` | Prove the B fix leaves all 40 other loci `identical()` |
+| `dev/imgt_release_check.R` | Smoke-test all loci against an IMGT release (used by CI; see [§11](#11-continuous-imgt-release-monitoring)) |
+
+Each `dev/` script resolves the repository root from its own file location, so it
+has no hardcoded paths and runs from any working directory or in CI.
 
 The before/after at full scale was produced by checking out the original two R
 files (`git checkout <upstream> -- R/alignmentFull.R R/buildAlignments.R`),
 running `build_most_loci.R original`, restoring the optimized files, running
 `build_most_loci.R optimized`, then `compare_most_loci.R`.
 
-Run any of them with, e.g.:
+Run any of them with, e.g. (each script locates the repo root from its own
+path, so it works from any working directory):
 
 ```pwsh
-Rscript "C:\GitHub\HLAtools_fast\dev\verify_baseline.R"
+Rscript dev/verify_baseline.R
 ```
 
-Fixtures live in `tests/testthat/fixtures/` (`alignmentFull_baseline.rds` and the
-per-call fast baseline).
+Fixtures live in `tests/testthat/fixtures/` (`alignmentFull_baseline.rds`; the
+per-call fast baseline is regenerated on demand).
 
 ---
 
@@ -411,5 +416,40 @@ B at all.
 
 ---
 
+## 11. Continuous IMGT release monitoring
+
+The package downloads alignment data live from the ANHIG/IMGTHLA GitHub
+repository, which IMGT updates roughly quarterly. As the HLA-B case showed, a new
+release can introduce data that the alignment parser chokes on. To catch that
+proactively, this fork adds a scheduled GitHub Actions workflow
+(`.github/workflows/imgt-release-check.yml`) that builds the alignments against
+the live release data and turns red if anything breaks.
+
+The workflow runs `dev/imgt_release_check.R`, which:
+
+1. Runs the real user path — `alignmentFull(loci = "all", alignType = "all")` —
+   against `"Latest"`.
+2. **On success:** reports the version and locus counts, exits 0.
+3. **On failure:** runs a per-locus / per-source sweep and prints exactly which
+   build(s) broke (the same diagnostic that isolated the HLA-B bug), then exits
+   non-zero so the job fails and the maintainer is notified.
+
+It also runs the unit + regression test suite (with `NOT_CRAN` set so the
+network-guarded HLA-B regression test runs against the live data).
+
+**Triggers.** Weekly (`cron`), plus a manual *Run workflow* button that accepts a
+specific version to test (e.g. the day a new release drops). Note that GitHub
+only fires *scheduled* workflows from a repository's **default branch**, so the
+weekly schedule begins once this work is on the default branch; the manual
+trigger works from any branch immediately.
+
+**Scope.** The loci tested come from the bundled `HLAgazetteer`, so this verifies
+that *existing* loci still build under a new release. A release that adds an
+entirely new locus would also require rebuilding the gazetteer
+(`buildGazetteer()` / `updateAll()`) — a separate concern from this check.
+
+---
+
 *Generated as part of the HLAtools performance-optimization effort. All
-optimizations verified to produce output `identical()` to HLAtools v1.8.1.*
+performance optimizations are verified to produce output `identical()` to
+HLAtools v1.8.1; the HLA-B fix is the one intentional, validated behavior change.*

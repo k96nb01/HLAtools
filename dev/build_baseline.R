@@ -11,7 +11,9 @@
 # Version is PINNED to a concrete release (not "Latest") so the baseline is
 # reproducible: IPD-IMGT/HLA release branches are immutable upstream.
 
-suppressMessages(pkgload::load_all("C:/GitHub/HLAtools_fast", quiet = TRUE))
+.scriptArgs <- commandArgs(FALSE); .scriptFile <- sub("^--file=", "", .scriptArgs[grep("^--file=", .scriptArgs)])
+pkg_root <- if (length(.scriptFile)) dirname(dirname(normalizePath(.scriptFile))) else normalizePath(getwd())  # repo root = parent of dev/
+suppressMessages(pkgload::load_all(pkg_root, quiet = TRUE))
 
 VERSION <- "3.64.0"
 # Representative loci:
@@ -20,7 +22,7 @@ VERSION <- "3.64.0"
 #   DPB1  - class II, DP naming conventions
 LOCI <- c("A", "DRB1", "DPB1")
 
-fixtures <- "C:/GitHub/HLAtools_fast/tests/testthat/fixtures"
+fixtures <- file.path(pkg_root, "tests/testthat/fixtures")
 dir.create(fixtures, recursive = TRUE, showWarnings = FALSE)
 
 cat("Building baseline: loci =", paste(LOCI, collapse=", "),

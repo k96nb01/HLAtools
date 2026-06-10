@@ -7,12 +7,14 @@
 #
 # Usage:  Rscript build_most_loci.R <label>   # label = "original" | "optimized"
 
-suppressMessages(pkgload::load_all("C:/GitHub/HLAtools_fast", quiet = TRUE))
+.scriptArgs <- commandArgs(FALSE); .scriptFile <- sub("^--file=", "", .scriptArgs[grep("^--file=", .scriptArgs)])
+pkg_root <- if (length(.scriptFile)) dirname(dirname(normalizePath(.scriptFile))) else normalizePath(getwd())  # repo root = parent of dev/
+suppressMessages(pkgload::load_all(pkg_root, quiet = TRUE))
 
 label <- commandArgs(trailingOnly = TRUE)
 label <- if (length(label)) label[1] else "run"
 VERSION <- "3.64.0"
-out <- sprintf("C:/GitHub/HLAtools_fast/dev/most_loci_%s.rds", label)
+out <- sprintf(file.path(pkg_root, "dev/most_loci_%s.rds"), label)
 
 # Every gazetteer locus across the three sources, minus the B-cDNA offender.
 loci <- setdiff(unique(c(HLAgazetteer$nuc, HLAgazetteer$gen, HLAgazetteer$prot)), "B")

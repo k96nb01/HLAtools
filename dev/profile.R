@@ -4,7 +4,9 @@
 # network. We pin a concrete version so downloads are cached-stable and the
 # (small) network portion doesn't dominate the signal.
 
-suppressMessages(pkgload::load_all("C:/GitHub/HLAtools_fast", quiet = TRUE))
+.scriptArgs <- commandArgs(FALSE); .scriptFile <- sub("^--file=", "", .scriptArgs[grep("^--file=", .scriptArgs)])
+pkg_root <- if (length(.scriptFile)) dirname(dirname(normalizePath(.scriptFile))) else normalizePath(getwd())  # repo root = parent of dev/
+suppressMessages(pkgload::load_all(pkg_root, quiet = TRUE))
 VERSION <- "3.64.0"
 
 # Pre-warm: do one throwaway build so the download for A is done before we

@@ -10,10 +10,12 @@
 #
 # Exit 0 = all identical, 1 = any mismatch.
 
-suppressMessages(pkgload::load_all("C:/GitHub/HLAtools_fast", quiet = TRUE))
+.scriptArgs <- commandArgs(FALSE); .scriptFile <- sub("^--file=", "", .scriptArgs[grep("^--file=", .scriptArgs)])
+pkg_root <- if (length(.scriptFile)) dirname(dirname(normalizePath(.scriptFile))) else normalizePath(getwd())  # repo root = parent of dev/
+suppressMessages(pkgload::load_all(pkg_root, quiet = TRUE))
 
 VERSION  <- "3.64.0"
-fixtures <- "C:/GitHub/HLAtools_fast/tests/testthat/fixtures"
+fixtures <- file.path(pkg_root, "tests/testthat/fixtures")
 fast_rds <- file.path(fixtures, "buildAlignments_fast_baseline.rds")
 
 # Focused call set covering all hotspots:
