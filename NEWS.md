@@ -1,7 +1,7 @@
 ### HLAtools
 
 ### development version (performance fork)
-- June 10, 2026
+- June 9, 2026
 - Optimized `alignmentFull()` and `buildAlignments()` for performance: a full multi-locus build is roughly 2.9x faster, with output `identical()` to version 1.8.1. The reference-sequence distribution and correspondence-table loops were vectorized, a degenerate regex sequence split was replaced with the empty-pattern fast path, and `alignmentFull()` no longer downloads and parses each cDNA alignment twice.
 - Fixed a crash in the default `alignmentFull(loci = "all")`. A few HLA-B cDNA alleles (e.g. `B*44:568Q`, `B*51:197`) appear in trailing alignment blocks that the reference allele does not span, leaving their sequences a different length than the reference; these are now normalized to the reference length rather than corrupting the alignment matrix.
 - Added a `testthat` test suite, which the package previously lacked. It covers the offline (non-network) functions with golden tests, the alignment-consuming functions via a saved fixture, and the HLA-B fix via a network-guarded regression test.
